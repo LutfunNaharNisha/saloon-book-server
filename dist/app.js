@@ -1,18 +1,14 @@
-"use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-const cors_1 = __importDefault(require("cors"));
-const dotenv_1 = __importDefault(require("dotenv"));
-const express_1 = __importDefault(require("express"));
-const db_1 = require("./config/db");
-const payment_controller_1 = require("./controllers/payment.controller");
-const admin_routes_1 = __importDefault(require("./routes/admin.routes"));
-const appointment_routes_1 = __importDefault(require("./routes/appointment.routes"));
-const payment_routes_1 = __importDefault(require("./routes/payment.routes"));
-const service_routes_1 = __importDefault(require("./routes/service.routes"));
-dotenv_1.default.config();
-const app = (0, express_1.default)();
+import cors from "cors";
+import dotenv from "dotenv";
+import express from "express";
+import { connectDB } from "./config/db.js";
+import { handleStripeWebhook } from "./controllers/payment.controller.js";
+import adminRoutes from "./routes/admin.routes.js";
+import appointmentRoutes from "./routes/appointment.routes.js";
+import paymentRoutes from "./routes/payment.routes.js";
+import serviceRoutes from "./routes/service.routes.js";
+dotenv.config();
+const app = express();
 app.set("trust proxy", 1);
 /**
  * Origins allowed to call this API. The deployed client (and local dev) are
@@ -35,7 +31,7 @@ const allowedOrigins = [
 const allowedOriginPatterns = [
     /^https:\/\/saloon-book-client(?:-[a-z0-9-]+)?\.vercel\.app$/i,
 ];
-app.use((0, cors_1.default)({
+app.use(cors({
     origin: (origin, callback) => {
         const normalized = origin?.replace(/\/$/, "");
         if (!normalized ||
@@ -59,7 +55,7 @@ app.use((0, cors_1.default)({
  */
 const ensureDatabase = async (_req, res, next) => {
     try {
-        await (0, db_1.connectDB)();
+        await connectDB();
         next();
     }
     catch (error) {
@@ -72,16 +68,16 @@ const ensureDatabase = async (_req, res, next) => {
 };
 app.use("/api", ensureDatabase);
 // 1. Stripe webhook MUST come before express.json() to receive the raw body.
-app.post("/api/payments/webhook", express_1.default.raw({ type: "application/json" }), payment_controller_1.handleStripeWebhook);
+app.post("/api/payments/webhook", express.raw({ type: "application/json" }), handleStripeWebhook);
 // 2. Standard body parsers. Better Auth is hosted by the frontend; this API
 // only accepts JWTs issued there via the Authorization: Bearer header.
-app.use(express_1.default.json({ limit: "2mb" }));
-app.use(express_1.default.urlencoded({ extended: true }));
+app.use(express.json({ limit: "2mb" }));
+app.use(express.urlencoded({ extended: true }));
 // 3. Application REST API routes.
-app.use("/api/services", service_routes_1.default);
-app.use("/api/appointments", appointment_routes_1.default);
-app.use("/api/payments", payment_routes_1.default);
-app.use("/api/admin", admin_routes_1.default);
+app.use("/api/services", serviceRoutes);
+app.use("/api/appointments", appointmentRoutes);
+app.use("/api/payments", paymentRoutes);
+app.use("/api/admin", adminRoutes);
 app.get("/", (_req, res) => {
     res.status(200).json({
         success: true,
@@ -106,4 +102,6 @@ app.use((err, _req, res, _next) => {
         message: err.message || "Internal server error.",
     });
 });
-module.exports = app;
+// The project is native ES modules. Vercel's Node.js builder imports the
+// default export from this single Express entry point for every route.
+export default app;

@@ -1,23 +1,18 @@
-"use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-const node_crypto_1 = require("node:crypto");
-const node_util_1 = require("node:util");
-const dotenv_1 = __importDefault(require("dotenv"));
-const mongodb_1 = require("mongodb");
-const mongoose_1 = __importDefault(require("mongoose"));
-dotenv_1.default.config();
-const db_1 = require("../config/db");
-const Service_1 = require("../models/Service");
+import { randomBytes, scrypt } from "node:crypto";
+import { promisify } from "node:util";
+import dotenv from "dotenv";
+import { ObjectId } from "mongodb";
+import mongoose from "mongoose";
+dotenv.config();
+import { connectDB, getMongoClient } from "../config/db.js";
+import { Service } from "../models/Service.js";
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "admin@salonbook.com";
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "Admin123";
 const ADMIN_NAME = process.env.ADMIN_NAME || "Salon Administrator";
 const CUSTOMER_EMAIL = process.env.DEMO_CUSTOMER_EMAIL || "customer@salonbook.com";
 const CUSTOMER_PASSWORD = process.env.DEMO_CUSTOMER_PASSWORD || "Customer123";
 const CUSTOMER_NAME = process.env.DEMO_CUSTOMER_NAME || "Nisha Rahman";
-const scryptAsync = (0, node_util_1.promisify)(node_crypto_1.scrypt);
+const scryptAsync = promisify(scrypt);
 // Matches Better Auth's default password hasher (`@better-auth/utils/password`)
 // so seeded users can sign in through the frontend-hosted Better Auth instance.
 const SCRYPT_OPTIONS = {
@@ -27,7 +22,7 @@ const SCRYPT_OPTIONS = {
     maxmem: 128 * 16384 * 16 * 2,
 };
 const hashPassword = async (password) => {
-    const salt = (0, node_crypto_1.randomBytes)(16).toString("hex");
+    const salt = randomBytes(16).toString("hex");
     const key = await scryptAsync(password.normalize("NFKC"), salt, 64, SCRYPT_OPTIONS);
     return `${salt}:${key.toString("hex")}`;
 };
@@ -146,13 +141,13 @@ const seedServices = [
     },
 ];
 const ensureAccount = async (name, email, password, role, image) => {
-    const db = (0, db_1.getMongoClient)().db();
+    const db = getMongoClient().db();
     const users = db.collection("users");
     const accounts = db.collection("account");
     const normalizedEmail = email.toLowerCase();
     const phone = role === "admin" ? "+1 (555) 010-2000" : "+1 (555) 010-3000";
     const existing = await users.findOne({ email: normalizedEmail });
-    const userId = existing?._id ?? new mongodb_1.ObjectId();
+    const userId = existing?._id ?? new ObjectId();
     const now = new Date();
     if (existing) {
         console.log(`Account already exists: ${normalizedEmail}`);
@@ -201,23 +196,23 @@ const ensureAccount = async (name, email, password, role, image) => {
     console.log(`Ensured ${role} role for ${normalizedEmail}`);
 };
 const run = async () => {
-    await (0, db_1.connectDB)();
+    await connectDB();
     await ensureAccount(ADMIN_NAME, ADMIN_EMAIL, ADMIN_PASSWORD, "admin", "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=400&q=80");
     await ensureAccount(CUSTOMER_NAME, CUSTOMER_EMAIL, CUSTOMER_PASSWORD, "customer", "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=400&q=80");
     for (const service of seedServices) {
-        await Service_1.Service.updateOne({ serviceName: service.serviceName }, { $set: { ...service, status: "active" } }, { upsert: true });
+        await Service.updateOne({ serviceName: service.serviceName }, { $set: { ...service, status: "active" } }, { upsert: true });
     }
     console.log(`Seeded ${seedServices.length} salon services.`);
     console.log("\nSeed complete.");
     console.log(`Admin:    ${ADMIN_EMAIL} / ${ADMIN_PASSWORD}`);
     console.log(`Customer: ${CUSTOMER_EMAIL} / ${CUSTOMER_PASSWORD}`);
-    await mongoose_1.default.disconnect();
-    await (0, db_1.getMongoClient)().close();
+    await mongoose.disconnect();
+    await getMongoClient().close();
     process.exit(0);
 };
 run().catch(async (error) => {
     console.error("Seed failed:", error);
-    await mongoose_1.default.disconnect().catch(() => undefined);
-    await (0, db_1.getMongoClient)().close().catch(() => undefined);
+    await mongoose.disconnect().catch(() => undefined);
+    await getMongoClient().close().catch(() => undefined);
     process.exit(1);
 });

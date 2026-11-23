@@ -6,9 +6,9 @@ import {
 	getAllTransactions,
 	toggleCustomerBlock,
 	updateAppointmentStatus,
-} from "../controllers/admin.controller";
-import { getAdminServices } from "../controllers/service.controller";
-import { authenticate, authorizeAdmin } from "../middlewares/auth.middleware";
+} from "../controllers/admin.controller.js";
+import { getAdminServices } from "../controllers/service.controller.js";
+import { authenticate, authorizeAdmin } from "../middlewares/auth.middleware.js";
 
 const router = Router();
 

@@ -6,13 +6,13 @@ import express, {
 	RequestHandler,
 	Response,
 } from "express";
-import { connectDB } from "./config/db";
-import { handleStripeWebhook } from "./controllers/payment.controller";
+import { connectDB } from "./config/db.js";
+import { handleStripeWebhook } from "./controllers/payment.controller.js";
 
-import adminRoutes from "./routes/admin.routes";
-import appointmentRoutes from "./routes/appointment.routes";
-import paymentRoutes from "./routes/payment.routes";
-import serviceRoutes from "./routes/service.routes";
+import adminRoutes from "./routes/admin.routes.js";
+import appointmentRoutes from "./routes/appointment.routes.js";
+import paymentRoutes from "./routes/payment.routes.js";
+import serviceRoutes from "./routes/service.routes.js";
 
 dotenv.config();
 
@@ -135,7 +135,6 @@ app.use(
 	},
 );
 
-// `package.json` declares "type": "commonjs". Vercel's zero-config Express
-// builder expects the CommonJS form (`module.exports = app`) for such projects;
-// the TypeScript equivalent is `export =`.
-export = app;
+// The project is native ES modules. Vercel's Node.js builder imports the
+// default export from this single Express entry point for every route.
+export default app;

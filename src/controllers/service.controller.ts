@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
-import { Service } from "../models/Service";
-import { getObjectIdParam } from "../utils/params";
-import { isValidImageUrl } from "../utils/url";
+import { Service } from "../models/Service.js";
+import { getObjectIdParam } from "../utils/params.js";
+import { isValidImageUrl } from "../utils/url.js";
 
 // Public: Browse, search by name, filter by category, sort by price/date
 export const getServices = async (req: Request, res: Response) => {

@@ -1,14 +1,11 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.getAdminDashboard = exports.getAllTransactions = exports.toggleCustomerBlock = exports.getAllCustomers = exports.updateAppointmentStatus = exports.getAllAppointments = void 0;
-const db_1 = require("../config/db");
-const Appointment_1 = require("../models/Appointment");
-const Service_1 = require("../models/Service");
-const Transaction_1 = require("../models/Transaction");
-const params_1 = require("../utils/params");
-const usersCollection = () => (0, db_1.getMongoClient)().db().collection("users");
+import { getMongoClient } from "../config/db.js";
+import { Appointment } from "../models/Appointment.js";
+import { Service } from "../models/Service.js";
+import { Transaction } from "../models/Transaction.js";
+import { getObjectIdParam } from "../utils/params.js";
+const usersCollection = () => getMongoClient().db().collection("users");
 // Admin: View All Appointment Requests
-const getAllAppointments = async (req, res) => {
+export const getAllAppointments = async (req, res) => {
     try {
         const { status, search } = req.query;
         const match = {};
@@ -55,18 +52,17 @@ const getAllAppointments = async (req, res) => {
                 },
             });
         }
-        const appointments = await Appointment_1.Appointment.aggregate(pipeline);
+        const appointments = await Appointment.aggregate(pipeline);
         res.status(200).json({ success: true, data: appointments });
     }
     catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
 };
-exports.getAllAppointments = getAllAppointments;
 // Admin: Confirm or Cancel Appointment Request
-const updateAppointmentStatus = async (req, res) => {
+export const updateAppointmentStatus = async (req, res) => {
     try {
-        const appointmentId = (0, params_1.getObjectIdParam)(req.params.id);
+        const appointmentId = getObjectIdParam(req.params.id);
         if (!appointmentId) {
             return res
                 .status(400)
@@ -79,7 +75,7 @@ const updateAppointmentStatus = async (req, res) => {
                 message: "Status must be either confirmed or cancelled.",
             });
         }
-        const appointment = await Appointment_1.Appointment.findById(appointmentId);
+        const appointment = await Appointment.findById(appointmentId);
         if (!appointment) {
             return res
                 .status(404)
@@ -105,9 +101,8 @@ const updateAppointmentStatus = async (req, res) => {
         res.status(500).json({ success: false, message: error.message });
     }
 };
-exports.updateAppointmentStatus = updateAppointmentStatus;
 // Admin: Manage Registered Customers (List with appointment counts)
-const getAllCustomers = async (_req, res) => {
+export const getAllCustomers = async (_req, res) => {
     try {
         const customers = await usersCollection()
             .aggregate([
@@ -140,11 +135,10 @@ const getAllCustomers = async (_req, res) => {
         res.status(500).json({ success: false, message: error.message });
     }
 };
-exports.getAllCustomers = getAllCustomers;
 // Admin: Block / Unblock Customer
-const toggleCustomerBlock = async (req, res) => {
+export const toggleCustomerBlock = async (req, res) => {
     try {
-        const customerId = (0, params_1.getObjectIdParam)(req.params.id);
+        const customerId = getObjectIdParam(req.params.id);
         if (!customerId) {
             return res
                 .status(400)
@@ -176,11 +170,10 @@ const toggleCustomerBlock = async (req, res) => {
         res.status(500).json({ success: false, message: error.message });
     }
 };
-exports.toggleCustomerBlock = toggleCustomerBlock;
 // Admin: View All Payment Transactions
-const getAllTransactions = async (_req, res) => {
+export const getAllTransactions = async (_req, res) => {
     try {
-        const transactions = await Transaction_1.Transaction.aggregate([
+        const transactions = await Transaction.aggregate([
             { $sort: { createdAt: -1 } },
             {
                 $lookup: {
@@ -226,21 +219,20 @@ const getAllTransactions = async (_req, res) => {
         res.status(500).json({ success: false, message: error.message });
     }
 };
-exports.getAllTransactions = getAllTransactions;
 // Admin: Dashboard Metrics
-const getAdminDashboard = async (_req, res) => {
+export const getAdminDashboard = async (_req, res) => {
     try {
         const [totalCustomers, totalActiveServices, totalServices, totalAppointments, pendingAppointments, confirmedAppointments, cancelledAppointments, successfulPayments, paidTransactions, recentAppointments,] = await Promise.all([
             usersCollection().countDocuments({ role: "customer" }),
-            Service_1.Service.countDocuments({ status: "active" }),
-            Service_1.Service.countDocuments(),
-            Appointment_1.Appointment.countDocuments(),
-            Appointment_1.Appointment.countDocuments({ status: "pending" }),
-            Appointment_1.Appointment.countDocuments({ status: "confirmed" }),
-            Appointment_1.Appointment.countDocuments({ status: "cancelled" }),
-            Transaction_1.Transaction.countDocuments({ status: "paid" }),
-            Transaction_1.Transaction.find({ status: "paid" }),
-            Appointment_1.Appointment.aggregate([
+            Service.countDocuments({ status: "active" }),
+            Service.countDocuments(),
+            Appointment.countDocuments(),
+            Appointment.countDocuments({ status: "pending" }),
+            Appointment.countDocuments({ status: "confirmed" }),
+            Appointment.countDocuments({ status: "cancelled" }),
+            Transaction.countDocuments({ status: "paid" }),
+            Transaction.find({ status: "paid" }),
+            Appointment.aggregate([
                 { $sort: { createdAt: -1 } },
                 { $limit: 5 },
                 {
@@ -294,4 +286,3 @@ const getAdminDashboard = async (_req, res) => {
         res.status(500).json({ success: false, message: error.message });
     }
 };
-exports.getAdminDashboard = getAdminDashboard;

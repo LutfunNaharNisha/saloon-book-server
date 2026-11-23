@@ -5,8 +5,8 @@ import {
 	getServiceById,
 	getServices,
 	updateService,
-} from "../controllers/service.controller";
-import { authenticate, authorizeAdmin } from "../middlewares/auth.middleware";
+} from "../controllers/service.controller.js";
+import { authenticate, authorizeAdmin } from "../middlewares/auth.middleware.js";
 
 const router = Router();
 

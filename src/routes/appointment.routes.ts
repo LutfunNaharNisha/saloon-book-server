@@ -4,11 +4,11 @@ import {
 	cancelPendingAppointment,
 	getCustomerDashboard,
 	getMyAppointments,
-} from "../controllers/appointment.controller";
+} from "../controllers/appointment.controller.js";
 import {
 	authenticate,
 	authorizeCustomer,
-} from "../middlewares/auth.middleware";
+} from "../middlewares/auth.middleware.js";
 
 const router = Router();
 

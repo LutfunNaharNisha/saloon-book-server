@@ -1,7 +1,4 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.isValidImageUrl = void 0;
-const isValidImageUrl = (url) => {
+export const isValidImageUrl = (url) => {
     try {
         const parsed = new URL(url);
         return parsed.protocol === "https:" || parsed.protocol === "http:";
@@ -10,4 +7,3 @@ const isValidImageUrl = (url) => {
         return false;
     }
 };
-exports.isValidImageUrl = isValidImageUrl;

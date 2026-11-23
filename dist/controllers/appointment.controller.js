@@ -1,15 +1,9 @@
-"use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.getCustomerDashboard = exports.cancelPendingAppointment = exports.getMyAppointments = exports.createAppointment = exports.TIME_SLOTS = void 0;
-const mongoose_1 = __importDefault(require("mongoose"));
-const Appointment_1 = require("../models/Appointment");
-const Service_1 = require("../models/Service");
-const Transaction_1 = require("../models/Transaction");
-const params_1 = require("../utils/params");
-exports.TIME_SLOTS = [
+import mongoose from "mongoose";
+import { Appointment } from "../models/Appointment.js";
+import { Service } from "../models/Service.js";
+import { Transaction } from "../models/Transaction.js";
+import { getObjectIdParam } from "../utils/params.js";
+export const TIME_SLOTS = [
     "09:00 AM",
     "10:00 AM",
     "11:00 AM",
@@ -31,7 +25,7 @@ const parseAppointmentDay = (value) => {
     return day;
 };
 // Customer: Submit Appointment Request
-const createAppointment = async (req, res) => {
+export const createAppointment = async (req, res) => {
     try {
         const { serviceId, appointmentDate, timeSlot, message } = req.body;
         if (!serviceId || !appointmentDate || !timeSlot) {
@@ -40,7 +34,7 @@ const createAppointment = async (req, res) => {
                 message: "Service, appointment date and time slot are required.",
             });
         }
-        const serviceObjectId = (0, params_1.getObjectIdParam)(serviceId);
+        const serviceObjectId = getObjectIdParam(serviceId);
         if (!serviceObjectId) {
             return res
                 .status(400)
@@ -61,13 +55,13 @@ const createAppointment = async (req, res) => {
                 message: "Appointment date cannot be in the past.",
             });
         }
-        if (!exports.TIME_SLOTS.includes(timeSlot)) {
+        if (!TIME_SLOTS.includes(timeSlot)) {
             return res.status(400).json({
                 success: false,
                 message: "Please choose a valid time slot.",
             });
         }
-        const service = await Service_1.Service.findById(serviceObjectId);
+        const service = await Service.findById(serviceObjectId);
         if (!service || service.status !== "active") {
             return res.status(404).json({
                 success: false,
@@ -77,7 +71,7 @@ const createAppointment = async (req, res) => {
         const nextDay = new Date(day);
         nextDay.setUTCDate(nextDay.getUTCDate() + 1);
         // One active booking per date + time slot for the salon.
-        const conflict = await Appointment_1.Appointment.findOne({
+        const conflict = await Appointment.findOne({
             appointmentDate: { $gte: day, $lt: nextDay },
             timeSlot,
             status: { $in: ["pending", "confirmed"] },
@@ -88,9 +82,9 @@ const createAppointment = async (req, res) => {
                 message: "That time slot is already booked. Please choose another date or time.",
             });
         }
-        const appointment = await Appointment_1.Appointment.create({
+        const appointment = await Appointment.create({
             serviceId: service._id,
-            customerId: new mongoose_1.default.Types.ObjectId(req.user.id),
+            customerId: new mongoose.Types.ObjectId(req.user.id),
             appointmentDate: day,
             timeSlot,
             message: message?.trim() || "",
@@ -104,12 +98,11 @@ const createAppointment = async (req, res) => {
         res.status(400).json({ success: false, message: error.message });
     }
 };
-exports.createAppointment = createAppointment;
 // Customer: View Own Appointments & Status
-const getMyAppointments = async (req, res) => {
+export const getMyAppointments = async (req, res) => {
     try {
-        const appointments = await Appointment_1.Appointment.find({
-            customerId: new mongoose_1.default.Types.ObjectId(req.user.id),
+        const appointments = await Appointment.find({
+            customerId: new mongoose.Types.ObjectId(req.user.id),
         })
             .populate("serviceId", "serviceName category duration image status")
             .sort({ createdAt: -1 });
@@ -119,19 +112,18 @@ const getMyAppointments = async (req, res) => {
         res.status(500).json({ success: false, message: error.message });
     }
 };
-exports.getMyAppointments = getMyAppointments;
 // Customer: Cancel Pending Appointment Request
-const cancelPendingAppointment = async (req, res) => {
+export const cancelPendingAppointment = async (req, res) => {
     try {
-        const appointmentId = (0, params_1.getObjectIdParam)(req.params.id);
+        const appointmentId = getObjectIdParam(req.params.id);
         if (!appointmentId) {
             return res
                 .status(400)
                 .json({ success: false, message: "Invalid appointment ID." });
         }
-        const appointment = await Appointment_1.Appointment.findOne({
+        const appointment = await Appointment.findOne({
             _id: appointmentId,
-            customerId: new mongoose_1.default.Types.ObjectId(req.user.id),
+            customerId: new mongoose.Types.ObjectId(req.user.id),
         });
         if (!appointment) {
             return res
@@ -152,16 +144,15 @@ const cancelPendingAppointment = async (req, res) => {
         res.status(500).json({ success: false, message: error.message });
     }
 };
-exports.cancelPendingAppointment = cancelPendingAppointment;
 // Customer: Dashboard Stats & History
-const getCustomerDashboard = async (req, res) => {
+export const getCustomerDashboard = async (req, res) => {
     try {
-        const customerId = new mongoose_1.default.Types.ObjectId(req.user.id);
+        const customerId = new mongoose.Types.ObjectId(req.user.id);
         const [appointments, transactions] = await Promise.all([
-            Appointment_1.Appointment.find({ customerId })
+            Appointment.find({ customerId })
                 .populate("serviceId", "serviceName category duration image status")
                 .sort({ createdAt: -1 }),
-            Transaction_1.Transaction.find({ customerId })
+            Transaction.find({ customerId })
                 .populate("appointmentId", "appointmentDate timeSlot")
                 .sort({ createdAt: -1 }),
         ]);
@@ -184,4 +175,3 @@ const getCustomerDashboard = async (req, res) => {
         res.status(500).json({ success: false, message: error.message });
     }
 };
-exports.getCustomerDashboard = getCustomerDashboard;

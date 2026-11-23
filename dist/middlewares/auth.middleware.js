@@ -1,12 +1,10 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.authorizeCustomer = exports.authorizeAdmin = exports.authenticate = void 0;
-const jose_1 = require("jose");
-const mongodb_1 = require("mongodb");
-const db_1 = require("../config/db");
+import { createPublicKey } from "node:crypto";
+import jwt from "jsonwebtoken";
+import { ObjectId } from "mongodb";
+import { getMongoClient } from "../config/db.js";
 /**
  * Better Auth (and its `/api/auth/jwks` endpoint) lives in the frontend app.
- * The backend only verifies the JWTs that the frontend issues for the session.
+ * This API only verifies the JWTs that the frontend issues for the session.
  * `AUTH_URL` must match the frontend's `BETTER_AUTH_URL` so the issuer,
  * audience and signing keys all line up.
  */
@@ -18,28 +16,108 @@ const authUrl = (process.env.AUTH_URL ||
     .split(",")[0]
     .trim()
     .replace(/\/$/, "");
-let jwks = null;
-const getJwks = () => {
-    if (!jwks) {
-        jwks = (0, jose_1.createRemoteJWKSet)(new URL(`${authUrl}/api/auth/jwks`));
+const jwksUrl = `${authUrl}/api/auth/jwks`;
+/** jsonwebtoken can verify any asymmetric algorithm supported by Node. */
+const SUPPORTED_ALGORITHMS = [
+    "RS256",
+    "RS384",
+    "RS512",
+    "PS256",
+    "PS384",
+    "PS512",
+    "ES256",
+    "ES384",
+    "ES512",
+];
+const publicKeys = new Map();
+let jwksRequest = null;
+const fetchJwks = () => {
+    if (!jwksRequest) {
+        jwksRequest = (async () => {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 5000);
+            try {
+                const response = await fetch(jwksUrl, {
+                    signal: controller.signal,
+                    headers: { accept: "application/json" },
+                });
+                if (!response.ok) {
+                    throw new Error(`JWKS request failed with ${response.status}`);
+                }
+                const body = (await response.json());
+                if (!Array.isArray(body.keys) || body.keys.length === 0) {
+                    throw new Error("JWKS response did not contain any keys");
+                }
+                return body.keys;
+            }
+            finally {
+                clearTimeout(timeout);
+            }
+        })().catch((error) => {
+            // Allow a later request to retry after a transient failure.
+            jwksRequest = null;
+            throw error;
+        });
     }
-    return jwks;
+    return jwksRequest;
 };
-const usersCollection = () => (0, db_1.getMongoClient)().db().collection("users");
+const keyFromJwk = (jwk) => createPublicKey({ key: jwk, format: "jwk" });
+/** Resolve the public key for a token, forcing one JWKS refresh on a new kid. */
+const getPublicKey = async (kid) => {
+    if (kid && publicKeys.has(kid))
+        return publicKeys.get(kid);
+    const keys = await fetchJwks();
+    let fallback;
+    for (const jwk of keys) {
+        let key;
+        try {
+            key = keyFromJwk(jwk);
+        }
+        catch {
+            continue;
+        }
+        if (jwk.kid)
+            publicKeys.set(jwk.kid, key);
+        if (!kid || jwk.kid === kid)
+            return key;
+        fallback ??= key;
+    }
+    if (fallback && !kid)
+        return fallback;
+    throw new Error(`No JWKS key found for kid "${kid ?? "<none>"}"`);
+};
+const getSigningKey = async (token) => {
+    const decoded = jwt.decode(token, { complete: true });
+    if (!decoded || typeof decoded === "string") {
+        throw new Error("Malformed JWT");
+    }
+    try {
+        return await getPublicKey(decoded.header.kid);
+    }
+    catch {
+        // A key may have rotated since the JWKS was cached. Refresh once.
+        jwksRequest = null;
+        publicKeys.clear();
+        return getPublicKey(decoded.header.kid);
+    }
+};
+const usersCollection = () => getMongoClient().db().collection("users");
 /**
- * Verifies a Better Auth issued JWT (Bearer token) using the frontend's JWKS
- * endpoint, then loads the freshest role/blocked state from MongoDB.
+ * Verifies a frontend-issued JWT against the frontend JWKS, then loads the
+ * freshest role/blocked state from MongoDB.
  */
 const getUserFromJwt = async (token) => {
-    const { payload } = await (0, jose_1.jwtVerify)(token, getJwks(), {
+    const key = await getSigningKey(token);
+    const payload = jwt.verify(token, key, {
+        algorithms: [...SUPPORTED_ALGORITHMS],
         issuer: authUrl,
         audience: authUrl,
     });
     const rawId = payload.sub || payload.id;
     const id = typeof rawId === "string" ? rawId : "";
-    if (!id || !mongodb_1.ObjectId.isValid(id))
+    if (!id || !ObjectId.isValid(id))
         return null;
-    const user = await usersCollection().findOne({ _id: new mongodb_1.ObjectId(id) });
+    const user = await usersCollection().findOne({ _id: new ObjectId(id) });
     if (!user)
         return null;
     return {
@@ -50,7 +128,7 @@ const getUserFromJwt = async (token) => {
         isBlocked: Boolean(user.isBlocked),
     };
 };
-const authenticate = async (req, res, next) => {
+export const authenticate = async (req, res, next) => {
     const authHeader = req.headers.authorization;
     if (!authHeader?.startsWith("Bearer ")) {
         res.status(401).json({
@@ -85,8 +163,7 @@ const authenticate = async (req, res, next) => {
         });
     }
 };
-exports.authenticate = authenticate;
-const authorizeAdmin = (req, res, next) => {
+export const authorizeAdmin = (req, res, next) => {
     if (!req.user || req.user.role !== "admin") {
         res.status(403).json({
             success: false,
@@ -96,8 +173,7 @@ const authorizeAdmin = (req, res, next) => {
     }
     next();
 };
-exports.authorizeAdmin = authorizeAdmin;
-const authorizeCustomer = (req, res, next) => {
+export const authorizeCustomer = (req, res, next) => {
     if (!req.user || req.user.role !== "customer") {
         res.status(403).json({
             success: false,
@@ -107,4 +183,3 @@ const authorizeCustomer = (req, res, next) => {
     }
     next();
 };
-exports.authorizeCustomer = authorizeCustomer;

@@ -1,9 +1,9 @@
 import { Request, Response } from "express";
 import mongoose from "mongoose";
-import { getStripe } from "../config/stripe";
-import { AuthRequest } from "../middlewares/auth.middleware";
-import { Appointment } from "../models/Appointment";
-import { Transaction } from "../models/Transaction";
+import { getStripe } from "../config/stripe.js";
+import { AuthRequest } from "../middlewares/auth.middleware.js";
+import { Appointment } from "../models/Appointment.js";
+import { Transaction } from "../models/Transaction.js";
 
 const markPaid = async (session: any) => {
 	const appointmentId = session.metadata?.appointmentId;

@@ -1,25 +1,19 @@
-"use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.getMyTransactions = exports.handleStripeWebhook = exports.verifyCheckoutSession = exports.createCheckoutSession = void 0;
-const mongoose_1 = __importDefault(require("mongoose"));
-const stripe_1 = require("../config/stripe");
-const Appointment_1 = require("../models/Appointment");
-const Transaction_1 = require("../models/Transaction");
+import mongoose from "mongoose";
+import { getStripe } from "../config/stripe.js";
+import { Appointment } from "../models/Appointment.js";
+import { Transaction } from "../models/Transaction.js";
 const markPaid = async (session) => {
     const appointmentId = session.metadata?.appointmentId;
     const customerId = session.metadata?.customerId;
     if (!appointmentId || !customerId)
         return;
-    await Appointment_1.Appointment.findByIdAndUpdate(appointmentId, {
+    await Appointment.findByIdAndUpdate(appointmentId, {
         paymentStatus: "paid",
     });
-    await Transaction_1.Transaction.findOneAndUpdate({ stripeSessionId: session.id }, {
+    await Transaction.findOneAndUpdate({ stripeSessionId: session.id }, {
         $set: {
-            appointmentId: new mongoose_1.default.Types.ObjectId(appointmentId),
-            customerId: new mongoose_1.default.Types.ObjectId(customerId),
+            appointmentId: new mongoose.Types.ObjectId(appointmentId),
+            customerId: new mongoose.Types.ObjectId(customerId),
             amount: (session.amount_total || 0) / 100,
             currency: session.currency || "usd",
             stripeSessionId: session.id,
@@ -28,16 +22,16 @@ const markPaid = async (session) => {
     }, { upsert: true, new: true });
 };
 // Customer: Create Stripe Checkout Session for a Confirmed Appointment
-const createCheckoutSession = async (req, res) => {
+export const createCheckoutSession = async (req, res) => {
     try {
         const { appointmentId } = req.body;
-        if (!appointmentId || !mongoose_1.default.Types.ObjectId.isValid(appointmentId)) {
+        if (!appointmentId || !mongoose.Types.ObjectId.isValid(appointmentId)) {
             return res
                 .status(400)
                 .json({ success: false, message: "Invalid appointment ID." });
         }
-        const customerId = new mongoose_1.default.Types.ObjectId(req.user.id);
-        const appointment = await Appointment_1.Appointment.findOne({
+        const customerId = new mongoose.Types.ObjectId(req.user.id);
+        const appointment = await Appointment.findOne({
             _id: appointmentId,
             customerId,
         }).populate("serviceId");
@@ -66,7 +60,7 @@ const createCheckoutSession = async (req, res) => {
             .split(",")[0]
             .trim()
             .replace(/\/$/, "");
-        const session = await (0, stripe_1.getStripe)().checkout.sessions.create({
+        const session = await getStripe().checkout.sessions.create({
             payment_method_types: ["card"],
             mode: "payment",
             customer_email: req.user.email,
@@ -103,9 +97,8 @@ const createCheckoutSession = async (req, res) => {
         res.status(500).json({ success: false, message: error.message });
     }
 };
-exports.createCheckoutSession = createCheckoutSession;
 // Customer: Verify a Checkout Session after redirect (webhook fallback / UX)
-const verifyCheckoutSession = async (req, res) => {
+export const verifyCheckoutSession = async (req, res) => {
     try {
         const sessionId = req.query.session_id;
         if (!sessionId || typeof sessionId !== "string") {
@@ -114,7 +107,7 @@ const verifyCheckoutSession = async (req, res) => {
                 message: "Missing Stripe checkout session ID.",
             });
         }
-        const session = await (0, stripe_1.getStripe)().checkout.sessions.retrieve(sessionId);
+        const session = await getStripe().checkout.sessions.retrieve(sessionId);
         if (session.metadata?.customerId !== req.user.id) {
             return res.status(403).json({
                 success: false,
@@ -141,9 +134,8 @@ const verifyCheckoutSession = async (req, res) => {
         res.status(500).json({ success: false, message: error.message });
     }
 };
-exports.verifyCheckoutSession = verifyCheckoutSession;
 // Stripe Webhook Handler (raw body required)
-const handleStripeWebhook = async (req, res) => {
+export const handleStripeWebhook = async (req, res) => {
     const sig = req.headers["stripe-signature"];
     let event;
     // Express is the request handler on Vercel, so `express.raw` normally gives
@@ -154,7 +146,7 @@ const handleStripeWebhook = async (req, res) => {
             ? req.body
             : JSON.stringify(req.body ?? {}));
     try {
-        event = (0, stripe_1.getStripe)().webhooks.constructEvent(rawBody, sig, process.env.STRIPE_WEBHOOK_SECRET);
+        event = getStripe().webhooks.constructEvent(rawBody, sig, process.env.STRIPE_WEBHOOK_SECRET);
     }
     catch (err) {
         return res.status(400).send(`Webhook Error: ${err.message}`);
@@ -171,10 +163,10 @@ const handleStripeWebhook = async (req, res) => {
             const session = event.data.object;
             const { appointmentId, customerId } = session.metadata || {};
             if (appointmentId && customerId) {
-                await Transaction_1.Transaction.findOneAndUpdate({ stripeSessionId: session.id }, {
+                await Transaction.findOneAndUpdate({ stripeSessionId: session.id }, {
                     $set: {
-                        appointmentId: new mongoose_1.default.Types.ObjectId(appointmentId),
-                        customerId: new mongoose_1.default.Types.ObjectId(customerId),
+                        appointmentId: new mongoose.Types.ObjectId(appointmentId),
+                        customerId: new mongoose.Types.ObjectId(customerId),
                         amount: (session.amount_total || 0) / 100,
                         currency: session.currency || "usd",
                         stripeSessionId: session.id,
@@ -189,12 +181,11 @@ const handleStripeWebhook = async (req, res) => {
         res.status(500).send(`Webhook handler error: ${error.message}`);
     }
 };
-exports.handleStripeWebhook = handleStripeWebhook;
 // Customer: View Own Payment History
-const getMyTransactions = async (req, res) => {
+export const getMyTransactions = async (req, res) => {
     try {
-        const transactions = await Transaction_1.Transaction.find({
-            customerId: new mongoose_1.default.Types.ObjectId(req.user.id),
+        const transactions = await Transaction.find({
+            customerId: new mongoose.Types.ObjectId(req.user.id),
         })
             .populate({
             path: "appointmentId",
@@ -210,4 +201,3 @@ const getMyTransactions = async (req, res) => {
         res.status(500).json({ success: false, message: error.message });
     }
 };
-exports.getMyTransactions = getMyTransactions;

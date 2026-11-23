@@ -6,8 +6,8 @@ import mongoose from "mongoose";
 
 dotenv.config();
 
-import { connectDB, getMongoClient } from "../config/db";
-import { Service } from "../models/Service";
+import { connectDB, getMongoClient } from "../config/db.js";
+import { Service } from "../models/Service.js";
 
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "admin@salonbook.com";
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "Admin123";

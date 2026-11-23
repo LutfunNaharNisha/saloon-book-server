@@ -1,10 +1,10 @@
 import { Response } from "express";
-import { getMongoClient } from "../config/db";
-import { AuthRequest } from "../middlewares/auth.middleware";
-import { Appointment } from "../models/Appointment";
-import { Service } from "../models/Service";
-import { Transaction } from "../models/Transaction";
-import { getObjectIdParam } from "../utils/params";
+import { getMongoClient } from "../config/db.js";
+import { AuthRequest } from "../middlewares/auth.middleware.js";
+import { Appointment } from "../models/Appointment.js";
+import { Service } from "../models/Service.js";
+import { Transaction } from "../models/Transaction.js";
+import { getObjectIdParam } from "../utils/params.js";
 
 const usersCollection = () => getMongoClient().db().collection("users");
 

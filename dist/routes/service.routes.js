@@ -1,14 +1,12 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-const express_1 = require("express");
-const service_controller_1 = require("../controllers/service.controller");
-const auth_middleware_1 = require("../middlewares/auth.middleware");
-const router = (0, express_1.Router)();
+import { Router } from "express";
+import { createService, deleteService, getServiceById, getServices, updateService, } from "../controllers/service.controller.js";
+import { authenticate, authorizeAdmin } from "../middlewares/auth.middleware.js";
+const router = Router();
 // Public
-router.get("/", service_controller_1.getServices);
-router.get("/:id", service_controller_1.getServiceById);
+router.get("/", getServices);
+router.get("/:id", getServiceById);
 // Admin only (client uploads images to ImgBB first, then sends the URL)
-router.post("/", auth_middleware_1.authenticate, auth_middleware_1.authorizeAdmin, service_controller_1.createService);
-router.patch("/:id", auth_middleware_1.authenticate, auth_middleware_1.authorizeAdmin, service_controller_1.updateService);
-router.delete("/:id", auth_middleware_1.authenticate, auth_middleware_1.authorizeAdmin, service_controller_1.deleteService);
-exports.default = router;
+router.post("/", authenticate, authorizeAdmin, createService);
+router.patch("/:id", authenticate, authorizeAdmin, updateService);
+router.delete("/:id", authenticate, authorizeAdmin, deleteService);
+export default router;

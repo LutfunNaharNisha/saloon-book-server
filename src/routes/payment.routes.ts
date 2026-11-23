@@ -3,11 +3,11 @@ import {
 	createCheckoutSession,
 	getMyTransactions,
 	verifyCheckoutSession,
-} from "../controllers/payment.controller";
+} from "../controllers/payment.controller.js";
 import {
 	authenticate,
 	authorizeCustomer,
-} from "../middlewares/auth.middleware";
+} from "../middlewares/auth.middleware.js";
 
 const router = Router();
 

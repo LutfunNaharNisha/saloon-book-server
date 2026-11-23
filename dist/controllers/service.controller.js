@@ -1,11 +1,8 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteService = exports.updateService = exports.createService = exports.getAdminServices = exports.getServiceById = exports.getServices = void 0;
-const Service_1 = require("../models/Service");
-const params_1 = require("../utils/params");
-const url_1 = require("../utils/url");
+import { Service } from "../models/Service.js";
+import { getObjectIdParam } from "../utils/params.js";
+import { isValidImageUrl } from "../utils/url.js";
 // Public: Browse, search by name, filter by category, sort by price/date
-const getServices = async (req, res) => {
+export const getServices = async (req, res) => {
     try {
         const { search, category, sort } = req.query;
         const filter = { status: "active" };
@@ -23,7 +20,7 @@ const getServices = async (req, res) => {
             : sort === "price-desc"
                 ? { price: -1 }
                 : { createdAt: -1 };
-        const services = await Service_1.Service.find(filter).sort(sortOption);
+        const services = await Service.find(filter).sort(sortOption);
         res.status(200).json({
             success: true,
             count: services.length,
@@ -34,17 +31,16 @@ const getServices = async (req, res) => {
         res.status(500).json({ success: false, message: error.message });
     }
 };
-exports.getServices = getServices;
 // Public: View Service Details
-const getServiceById = async (req, res) => {
+export const getServiceById = async (req, res) => {
     try {
-        const serviceId = (0, params_1.getObjectIdParam)(req.params.id);
+        const serviceId = getObjectIdParam(req.params.id);
         if (!serviceId) {
             return res
                 .status(400)
                 .json({ success: false, message: "Invalid service ID." });
         }
-        const service = await Service_1.Service.findById(serviceId);
+        const service = await Service.findById(serviceId);
         if (!service) {
             return res
                 .status(404)
@@ -56,9 +52,8 @@ const getServiceById = async (req, res) => {
         res.status(500).json({ success: false, message: error.message });
     }
 };
-exports.getServiceById = getServiceById;
 // Admin: View every service (active + inactive)
-const getAdminServices = async (req, res) => {
+export const getAdminServices = async (req, res) => {
     try {
         const { search, category, status, sort } = req.query;
         const filter = {};
@@ -79,7 +74,7 @@ const getAdminServices = async (req, res) => {
             : sort === "price-desc"
                 ? { price: -1 }
                 : { createdAt: -1 };
-        const services = await Service_1.Service.find(filter).sort(sortOption);
+        const services = await Service.find(filter).sort(sortOption);
         res.status(200).json({
             success: true,
             count: services.length,
@@ -90,9 +85,8 @@ const getAdminServices = async (req, res) => {
         res.status(500).json({ success: false, message: error.message });
     }
 };
-exports.getAdminServices = getAdminServices;
 // Admin: Add Service (receives an ImgBB URL from the client uploader)
-const createService = async (req, res) => {
+export const createService = async (req, res) => {
     try {
         const { serviceName, category, description, price, duration, image, status, } = req.body;
         if (!serviceName || !category || !description) {
@@ -121,13 +115,13 @@ const createService = async (req, res) => {
                 message: "A service image is required.",
             });
         }
-        if (!(0, url_1.isValidImageUrl)(image)) {
+        if (!isValidImageUrl(image)) {
             return res.status(400).json({
                 success: false,
                 message: "Invalid image URL. Please upload the image again and retry.",
             });
         }
-        const service = await Service_1.Service.create({
+        const service = await Service.create({
             serviceName: String(serviceName).trim(),
             category: String(category).trim(),
             description: String(description).trim(),
@@ -142,11 +136,10 @@ const createService = async (req, res) => {
         res.status(400).json({ success: false, message: error.message });
     }
 };
-exports.createService = createService;
 // Admin: Update Service
-const updateService = async (req, res) => {
+export const updateService = async (req, res) => {
     try {
-        const serviceId = (0, params_1.getObjectIdParam)(req.params.id);
+        const serviceId = getObjectIdParam(req.params.id);
         if (!serviceId) {
             return res
                 .status(400)
@@ -187,7 +180,7 @@ const updateService = async (req, res) => {
             updates.duration = value;
         }
         if (updates.image !== undefined && updates.image !== "") {
-            if (!(0, url_1.isValidImageUrl)(String(updates.image))) {
+            if (!isValidImageUrl(String(updates.image))) {
                 return res.status(400).json({
                     success: false,
                     message: "Invalid image URL. Please upload the image again and retry.",
@@ -202,7 +195,7 @@ const updateService = async (req, res) => {
                 });
             }
         }
-        const service = await Service_1.Service.findByIdAndUpdate(serviceId, updates, {
+        const service = await Service.findByIdAndUpdate(serviceId, updates, {
             new: true,
             runValidators: true,
         });
@@ -217,17 +210,16 @@ const updateService = async (req, res) => {
         res.status(400).json({ success: false, message: error.message });
     }
 };
-exports.updateService = updateService;
 // Admin: Delete Service
-const deleteService = async (req, res) => {
+export const deleteService = async (req, res) => {
     try {
-        const serviceId = (0, params_1.getObjectIdParam)(req.params.id);
+        const serviceId = getObjectIdParam(req.params.id);
         if (!serviceId) {
             return res
                 .status(400)
                 .json({ success: false, message: "Invalid service ID." });
         }
-        const service = await Service_1.Service.findByIdAndDelete(serviceId);
+        const service = await Service.findByIdAndDelete(serviceId);
         if (!service) {
             return res
                 .status(404)
@@ -242,4 +234,3 @@ const deleteService = async (req, res) => {
         res.status(500).json({ success: false, message: error.message });
     }
 };
-exports.deleteService = deleteService;

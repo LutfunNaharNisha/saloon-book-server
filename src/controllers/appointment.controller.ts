@@ -1,10 +1,10 @@
 import { Response } from "express";
 import mongoose from "mongoose";
-import { AuthRequest } from "../middlewares/auth.middleware";
-import { Appointment } from "../models/Appointment";
-import { Service } from "../models/Service";
-import { Transaction } from "../models/Transaction";
-import { getObjectIdParam } from "../utils/params";
+import { AuthRequest } from "../middlewares/auth.middleware.js";
+import { Appointment } from "../models/Appointment.js";
+import { Service } from "../models/Service.js";
+import { Transaction } from "../models/Transaction.js";
+import { getObjectIdParam } from "../utils/params.js";
 
 export const TIME_SLOTS = [
 	"09:00 AM",
