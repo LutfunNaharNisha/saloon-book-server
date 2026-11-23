@@ -1,0 +1,22 @@
+import { Router } from "express";
+import {
+	createAppointment,
+	cancelPendingAppointment,
+	getCustomerDashboard,
+	getMyAppointments,
+} from "../controllers/appointment.controller";
+import {
+	authenticate,
+	authorizeCustomer,
+} from "../middlewares/auth.middleware";
+
+const router = Router();
+
+router.use(authenticate, authorizeCustomer);
+
+router.post("/", createAppointment);
+router.get("/my-appointments", getMyAppointments);
+router.get("/dashboard", getCustomerDashboard);
+router.patch("/:id/cancel", cancelPendingAppointment);
+
+export default router;
