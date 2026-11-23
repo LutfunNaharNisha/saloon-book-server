@@ -1,0 +1,187 @@
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.getCustomerDashboard = exports.cancelPendingAppointment = exports.getMyAppointments = exports.createAppointment = exports.TIME_SLOTS = void 0;
+const mongoose_1 = __importDefault(require("mongoose"));
+const Appointment_1 = require("../models/Appointment");
+const Service_1 = require("../models/Service");
+const Transaction_1 = require("../models/Transaction");
+const params_1 = require("../utils/params");
+exports.TIME_SLOTS = [
+    "09:00 AM",
+    "10:00 AM",
+    "11:00 AM",
+    "12:00 PM",
+    "01:00 PM",
+    "02:00 PM",
+    "03:00 PM",
+    "04:00 PM",
+    "05:00 PM",
+    "06:00 PM",
+    "07:00 PM",
+];
+const parseAppointmentDay = (value) => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value))
+        return null;
+    const day = new Date(`${value}T00:00:00.000Z`);
+    if (Number.isNaN(day.getTime()))
+        return null;
+    return day;
+};
+// Customer: Submit Appointment Request
+const createAppointment = async (req, res) => {
+    try {
+        const { serviceId, appointmentDate, timeSlot, message } = req.body;
+        if (!serviceId || !appointmentDate || !timeSlot) {
+            return res.status(400).json({
+                success: false,
+                message: "Service, appointment date and time slot are required.",
+            });
+        }
+        const serviceObjectId = (0, params_1.getObjectIdParam)(serviceId);
+        if (!serviceObjectId) {
+            return res
+                .status(400)
+                .json({ success: false, message: "Invalid service ID." });
+        }
+        const day = parseAppointmentDay(appointmentDate);
+        if (!day) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid appointment date. Use YYYY-MM-DD.",
+            });
+        }
+        const today = new Date();
+        const todayUtc = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
+        if (day < todayUtc) {
+            return res.status(400).json({
+                success: false,
+                message: "Appointment date cannot be in the past.",
+            });
+        }
+        if (!exports.TIME_SLOTS.includes(timeSlot)) {
+            return res.status(400).json({
+                success: false,
+                message: "Please choose a valid time slot.",
+            });
+        }
+        const service = await Service_1.Service.findById(serviceObjectId);
+        if (!service || service.status !== "active") {
+            return res.status(404).json({
+                success: false,
+                message: "Selected service is unavailable or inactive.",
+            });
+        }
+        const nextDay = new Date(day);
+        nextDay.setUTCDate(nextDay.getUTCDate() + 1);
+        // One active booking per date + time slot for the salon.
+        const conflict = await Appointment_1.Appointment.findOne({
+            appointmentDate: { $gte: day, $lt: nextDay },
+            timeSlot,
+            status: { $in: ["pending", "confirmed"] },
+        });
+        if (conflict) {
+            return res.status(409).json({
+                success: false,
+                message: "That time slot is already booked. Please choose another date or time.",
+            });
+        }
+        const appointment = await Appointment_1.Appointment.create({
+            serviceId: service._id,
+            customerId: new mongoose_1.default.Types.ObjectId(req.user.id),
+            appointmentDate: day,
+            timeSlot,
+            message: message?.trim() || "",
+            servicePrice: service.price,
+            paymentStatus: "unpaid",
+            status: "pending",
+        });
+        res.status(201).json({ success: true, data: appointment });
+    }
+    catch (error) {
+        res.status(400).json({ success: false, message: error.message });
+    }
+};
+exports.createAppointment = createAppointment;
+// Customer: View Own Appointments & Status
+const getMyAppointments = async (req, res) => {
+    try {
+        const appointments = await Appointment_1.Appointment.find({
+            customerId: new mongoose_1.default.Types.ObjectId(req.user.id),
+        })
+            .populate("serviceId", "serviceName category duration image status")
+            .sort({ createdAt: -1 });
+        res.status(200).json({ success: true, data: appointments });
+    }
+    catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+exports.getMyAppointments = getMyAppointments;
+// Customer: Cancel Pending Appointment Request
+const cancelPendingAppointment = async (req, res) => {
+    try {
+        const appointmentId = (0, params_1.getObjectIdParam)(req.params.id);
+        if (!appointmentId) {
+            return res
+                .status(400)
+                .json({ success: false, message: "Invalid appointment ID." });
+        }
+        const appointment = await Appointment_1.Appointment.findOne({
+            _id: appointmentId,
+            customerId: new mongoose_1.default.Types.ObjectId(req.user.id),
+        });
+        if (!appointment) {
+            return res
+                .status(404)
+                .json({ success: false, message: "Appointment not found." });
+        }
+        if (appointment.status !== "pending") {
+            return res.status(400).json({
+                success: false,
+                message: `Only pending appointments can be cancelled. This appointment is ${appointment.status}.`,
+            });
+        }
+        appointment.status = "cancelled";
+        await appointment.save();
+        res.status(200).json({ success: true, data: appointment });
+    }
+    catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+exports.cancelPendingAppointment = cancelPendingAppointment;
+// Customer: Dashboard Stats & History
+const getCustomerDashboard = async (req, res) => {
+    try {
+        const customerId = new mongoose_1.default.Types.ObjectId(req.user.id);
+        const [appointments, transactions] = await Promise.all([
+            Appointment_1.Appointment.find({ customerId })
+                .populate("serviceId", "serviceName category duration image status")
+                .sort({ createdAt: -1 }),
+            Transaction_1.Transaction.find({ customerId })
+                .populate("appointmentId", "appointmentDate timeSlot")
+                .sort({ createdAt: -1 }),
+        ]);
+        const stats = {
+            totalAppointments: appointments.length,
+            pendingCount: appointments.filter((a) => a.status === "pending")
+                .length,
+            confirmedCount: appointments.filter((a) => a.status === "confirmed").length,
+            cancelledCount: appointments.filter((a) => a.status === "cancelled").length,
+            totalSpent: transactions
+                .filter((t) => t.status === "paid")
+                .reduce((sum, t) => sum + t.amount, 0),
+        };
+        res.status(200).json({
+            success: true,
+            data: { stats, appointments, transactions },
+        });
+    }
+    catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+exports.getCustomerDashboard = getCustomerDashboard;
