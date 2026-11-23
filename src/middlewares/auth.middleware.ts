@@ -1,7 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import { ObjectId } from "mongodb";
-import { mongoClient } from "../config/db";
+import { getMongoClient } from "../config/db";
 
 export interface AuthUser {
 	id: string;
@@ -21,10 +21,16 @@ export interface AuthRequest extends Request {
  * `AUTH_URL` must match the frontend's `BETTER_AUTH_URL` so the issuer,
  * audience and signing keys all line up.
  */
-const authUrl =
+const authUrl = (
 	process.env.AUTH_URL ||
 	process.env.CLIENT_URL ||
-	"http://localhost:3000";
+	(process.env.VERCEL
+		? "https://saloon-book-client.vercel.app"
+		: "http://localhost:3000")
+)
+	.split(",")[0]
+	.trim()
+	.replace(/\/$/, "");
 
 let jwks: ReturnType<typeof createRemoteJWKSet> | null = null;
 const getJwks = () => {
@@ -34,7 +40,7 @@ const getJwks = () => {
 	return jwks;
 };
 
-const usersCollection = () => mongoClient.db().collection("users");
+const usersCollection = () => getMongoClient().db().collection("users");
 
 /**
  * Verifies a Better Auth issued JWT (Bearer token) using the frontend's JWKS

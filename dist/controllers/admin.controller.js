@@ -6,7 +6,7 @@ const Appointment_1 = require("../models/Appointment");
 const Service_1 = require("../models/Service");
 const Transaction_1 = require("../models/Transaction");
 const params_1 = require("../utils/params");
-const usersCollection = () => db_1.mongoClient.db().collection("users");
+const usersCollection = () => (0, db_1.getMongoClient)().db().collection("users");
 // Admin: View All Appointment Requests
 const getAllAppointments = async (req, res) => {
     try {

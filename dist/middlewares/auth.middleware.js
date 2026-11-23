@@ -10,9 +10,14 @@ const db_1 = require("../config/db");
  * `AUTH_URL` must match the frontend's `BETTER_AUTH_URL` so the issuer,
  * audience and signing keys all line up.
  */
-const authUrl = process.env.AUTH_URL ||
+const authUrl = (process.env.AUTH_URL ||
     process.env.CLIENT_URL ||
-    "http://localhost:3000";
+    (process.env.VERCEL
+        ? "https://saloon-book-client.vercel.app"
+        : "http://localhost:3000"))
+    .split(",")[0]
+    .trim()
+    .replace(/\/$/, "");
 let jwks = null;
 const getJwks = () => {
     if (!jwks) {
@@ -20,7 +25,7 @@ const getJwks = () => {
     }
     return jwks;
 };
-const usersCollection = () => db_1.mongoClient.db().collection("users");
+const usersCollection = () => (0, db_1.getMongoClient)().db().collection("users");
 /**
  * Verifies a Better Auth issued JWT (Bearer token) using the frontend's JWKS
  * endpoint, then loads the freshest role/blocked state from MongoDB.

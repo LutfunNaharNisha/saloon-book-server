@@ -146,7 +146,7 @@ const seedServices = [
     },
 ];
 const ensureAccount = async (name, email, password, role, image) => {
-    const db = db_1.mongoClient.db();
+    const db = (0, db_1.getMongoClient)().db();
     const users = db.collection("users");
     const accounts = db.collection("account");
     const normalizedEmail = email.toLowerCase();
@@ -212,12 +212,12 @@ const run = async () => {
     console.log(`Admin:    ${ADMIN_EMAIL} / ${ADMIN_PASSWORD}`);
     console.log(`Customer: ${CUSTOMER_EMAIL} / ${CUSTOMER_PASSWORD}`);
     await mongoose_1.default.disconnect();
-    await db_1.mongoClient.close();
+    await (0, db_1.getMongoClient)().close();
     process.exit(0);
 };
 run().catch(async (error) => {
     console.error("Seed failed:", error);
     await mongoose_1.default.disconnect().catch(() => undefined);
-    await db_1.mongoClient.close().catch(() => undefined);
+    await (0, db_1.getMongoClient)().close().catch(() => undefined);
     process.exit(1);
 });

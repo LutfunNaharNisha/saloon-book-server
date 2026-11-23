@@ -6,7 +6,7 @@ import mongoose from "mongoose";
 
 dotenv.config();
 
-import { connectDB, mongoClient } from "../config/db";
+import { connectDB, getMongoClient } from "../config/db";
 import { Service } from "../models/Service";
 
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "admin@salonbook.com";
@@ -180,7 +180,7 @@ const ensureAccount = async (
 	role: "admin" | "customer",
 	image: string,
 ) => {
-	const db = mongoClient.db();
+	const db = getMongoClient().db();
 	const users = db.collection("users");
 	const accounts = db.collection("account");
 	const normalizedEmail = email.toLowerCase();
@@ -275,13 +275,13 @@ const run = async () => {
 	console.log(`Customer: ${CUSTOMER_EMAIL} / ${CUSTOMER_PASSWORD}`);
 
 	await mongoose.disconnect();
-	await mongoClient.close();
+	await getMongoClient().close();
 	process.exit(0);
 };
 
 run().catch(async (error) => {
 	console.error("Seed failed:", error);
 	await mongoose.disconnect().catch(() => undefined);
-	await mongoClient.close().catch(() => undefined);
+	await getMongoClient().close().catch(() => undefined);
 	process.exit(1);
 });

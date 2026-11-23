@@ -59,8 +59,14 @@ const createCheckoutSession = async (req, res) => {
             });
         }
         const service = appointment.serviceId;
-        const clientUrl = process.env.CLIENT_URL || "http://localhost:3000";
-        const session = await stripe_1.stripe.checkout.sessions.create({
+        const clientUrl = (process.env.CLIENT_URL ||
+            (process.env.VERCEL
+                ? "https://saloon-book-client.vercel.app"
+                : "http://localhost:3000"))
+            .split(",")[0]
+            .trim()
+            .replace(/\/$/, "");
+        const session = await (0, stripe_1.getStripe)().checkout.sessions.create({
             payment_method_types: ["card"],
             mode: "payment",
             customer_email: req.user.email,
@@ -108,7 +114,7 @@ const verifyCheckoutSession = async (req, res) => {
                 message: "Missing Stripe checkout session ID.",
             });
         }
-        const session = await stripe_1.stripe.checkout.sessions.retrieve(sessionId);
+        const session = await (0, stripe_1.getStripe)().checkout.sessions.retrieve(sessionId);
         if (session.metadata?.customerId !== req.user.id) {
             return res.status(403).json({
                 success: false,
@@ -140,8 +146,15 @@ exports.verifyCheckoutSession = verifyCheckoutSession;
 const handleStripeWebhook = async (req, res) => {
     const sig = req.headers["stripe-signature"];
     let event;
+    // Express is the request handler on Vercel, so `express.raw` normally gives
+    // us the Buffer. Keep a fallback for runtimes that pre-parse the body.
+    const rawBody = Buffer.isBuffer(req.body)
+        ? req.body
+        : Buffer.from(typeof req.body === "string"
+            ? req.body
+            : JSON.stringify(req.body ?? {}));
     try {
-        event = stripe_1.stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
+        event = (0, stripe_1.getStripe)().webhooks.constructEvent(rawBody, sig, process.env.STRIPE_WEBHOOK_SECRET);
     }
     catch (err) {
         return res.status(400).send(`Webhook Error: ${err.message}`);

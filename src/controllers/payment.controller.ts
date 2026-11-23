@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import mongoose from "mongoose";
-import { stripe } from "../config/stripe";
+import { getStripe } from "../config/stripe";
 import { AuthRequest } from "../middlewares/auth.middleware";
 import { Appointment } from "../models/Appointment";
 import { Transaction } from "../models/Transaction";
@@ -71,9 +71,17 @@ export const createCheckoutSession = async (
 		}
 
 		const service: any = appointment.serviceId;
-		const clientUrl = process.env.CLIENT_URL || "http://localhost:3000";
+		const clientUrl = (
+			process.env.CLIENT_URL ||
+			(process.env.VERCEL
+				? "https://saloon-book-client.vercel.app"
+				: "http://localhost:3000")
+		)
+			.split(",")[0]
+			.trim()
+			.replace(/\/$/, "");
 
-		const session = await stripe.checkout.sessions.create({
+		const session = await getStripe().checkout.sessions.create({
 			payment_method_types: ["card"],
 			mode: "payment",
 			customer_email: req.user!.email,
@@ -124,7 +132,7 @@ export const verifyCheckoutSession = async (req: AuthRequest, res: Response) => 
 			});
 		}
 
-		const session = await stripe.checkout.sessions.retrieve(sessionId);
+		const session = await getStripe().checkout.sessions.retrieve(sessionId);
 
 		if (session.metadata?.customerId !== req.user!.id) {
 			return res.status(403).json({
@@ -159,9 +167,19 @@ export const handleStripeWebhook = async (req: Request, res: Response) => {
 	const sig = req.headers["stripe-signature"] as string;
 	let event;
 
+	// Express is the request handler on Vercel, so `express.raw` normally gives
+	// us the Buffer. Keep a fallback for runtimes that pre-parse the body.
+	const rawBody = Buffer.isBuffer(req.body)
+		? req.body
+		: Buffer.from(
+				typeof req.body === "string"
+					? req.body
+					: JSON.stringify(req.body ?? {}),
+			);
+
 	try {
-		event = stripe.webhooks.constructEvent(
-			req.body,
+		event = getStripe().webhooks.constructEvent(
+			rawBody,
 			sig,
 			process.env.STRIPE_WEBHOOK_SECRET as string,
 		);
