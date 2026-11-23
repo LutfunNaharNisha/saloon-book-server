@@ -22,18 +22,29 @@ export interface AuthRequest extends Request {
  * `AUTH_URL` must match the frontend's `BETTER_AUTH_URL` so the issuer,
  * audience and signing keys all line up.
  */
+const PRODUCTION_CLIENT_URL = "https://saloon-book-client.vercel.app";
+
 const authUrl = (
 	process.env.AUTH_URL ||
 	process.env.CLIENT_URL ||
 	(process.env.VERCEL
-		? "https://saloon-book-client.vercel.app"
+		? PRODUCTION_CLIENT_URL
 		: "http://localhost:3000")
 )
 	.split(",")[0]
 	.trim()
 	.replace(/\/$/, "");
 
-const jwksUrl = `${authUrl}/api/auth/jwks`;
+// A deployed API must verify JWTs against the deployed client origin - never
+// against a local URL - otherwise tokens issued for the production client are
+// rejected with `401 Invalid or expired token`.
+const resolvedAuthBaseURL =
+	/^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i.test(authUrl) &&
+	process.env.VERCEL
+		? PRODUCTION_CLIENT_URL
+		: authUrl;
+
+const jwksUrl = `${resolvedAuthBaseURL}/api/auth/jwks`;
 
 /**
  * JsonWebToken is used for decoding and validating the token; the public key
@@ -140,8 +151,8 @@ const getUserFromJwt = async (token: string): Promise<AuthUser | null> => {
 	const key = await getSigningKey(token);
 	const payload = jwt.verify(token, key, {
 		algorithms: [...SUPPORTED_ALGORITHMS],
-		issuer: authUrl,
-		audience: authUrl,
+		issuer: resolvedAuthBaseURL,
+		audience: resolvedAuthBaseURL,
 	}) as jwt.JwtPayload;
 
 	const rawId = payload.sub || payload.id;
