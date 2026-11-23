@@ -135,4 +135,7 @@ app.use(
 	},
 );
 
-export default app;
+// `package.json` declares "type": "commonjs". Vercel's zero-config Express
+// builder expects the CommonJS form (`module.exports = app`) for such projects;
+// the TypeScript equivalent is `export =`.
+export = app;

@@ -23,6 +23,9 @@
 		"jwt"
 	],
 	"type": "commonjs",
+	"engines": {
+		"node": "22.x"
+	},
 	"bugs": {
 		"url": "https://github.com/LutfunNaharNisha/saloon-book-server/issues"
 	},
@@ -31,7 +34,7 @@
 		"cors": "^2.8.5",
 		"dotenv": "^16.4.5",
 		"express": "^4.21.0",
-		"jose": "^6.2.18",
+		"jose": "^4.15.9",
 		"mongodb": "^6.9.0",
 		"mongoose": "^8.7.0",
 		"stripe": "^17.2.0"

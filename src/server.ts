@@ -6,21 +6,20 @@ dotenv.config();
 
 const PORT = Number(process.env.PORT) || 5000;
 
-const startServer = async () => {
-	try {
-		await connectDB();
-	} catch (error) {
-		console.error("MongoDB connection error:", error);
-		// On serverless platforms the process must stay alive so that requests
-		// can receive a readable 503 instead of a crashed function invocation.
-		if (!process.env.VERCEL) {
-			process.exit(1);
-		}
-	}
+// Start listening before connecting so a slow/unreachable database can never
+// prevent the serverless function (or local server) from accepting requests.
+// The `/api` middleware connects lazily and answers 503 if the DB is down.
+const server = app.listen(PORT, () => {
+	console.log(`Server running on http://localhost:${PORT}`);
+});
 
-	app.listen(PORT, () => {
-		console.log(`Server running on http://localhost:${PORT}`);
-	});
+connectDB().catch((error) => {
+	console.error("MongoDB connection error:", error);
+});
+
+const shutdown = () => {
+	server.close(() => process.exit(0));
 };
 
-startServer();
+process.on("SIGTERM", shutdown);
+process.on("SIGINT", shutdown);
